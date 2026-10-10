@@ -197,8 +197,10 @@
                   ", hier kannst du dich für unsere Clubreise mit Weihnachtsfeier anmelden.");
     anrede.hidden = false;
   }
+  // Angezeigt wird der Name „Herbert Straßl“, die Kennung „Nr. 28 Straßl“ geht nur an die Web-App.
+  const anzeigename = `${vorname} ${mitglied.replace(/^Nr\.?\s*\d+\s+/, "")}`.trim();
   if (mitglied) {
-    document.getElementById("mitglied").textContent = mitglied;
+    document.getElementById("mitglied").textContent = anzeigename;
     document.getElementById("fuer").hidden = false;
   }
 
@@ -292,7 +294,7 @@
     if (personen === null) return;
     entwurf = { personen, begleitung: personen === 2 ? begleitung.value.trim() : "", anmerkung: anmerkung.value.trim() };
     merken(entwurf);
-    document.getElementById("pruefen-fuer").textContent = mitglied ? `für ${mitglied}` : "";
+    document.getElementById("pruefen-fuer").textContent = mitglied ? `für ${anzeigename}` : "";
     liste(document.getElementById("liste"), entwurf);
     const anm = document.getElementById("anm-anzeige");
     anm.hidden = !entwurf.anmerkung;
