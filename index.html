@@ -129,6 +129,7 @@
 
   <section id="schritt-anmelden">
   <h2>Deine Anmeldung</h2>
+  <p class="fuer2" id="bestand" hidden></p>
   <div class="wahl" role="radiogroup" aria-label="Anmeldung">
     <label class="option"><input type="radio" name="personen" value="1">
       <span class="titel">1 Person</span><span class="preis">250 €</span><span class="zusatz">Ich komme allein.</span></label>
@@ -208,6 +209,16 @@
   const begleitung = document.getElementById("begleitung");
   const anmerkung = document.getElementById("anmerkung");
   begleitung.value = vorschlag;
+  // Bestätigungslink für bereits Angemeldete: &p=2 wählt die bestehende Anmeldung vor.
+  const bestand = parameter.get("p");
+  if (["0", "1", "2"].includes(bestand)) {
+    optionen.forEach(o => { o.checked = o.value === bestand; });
+    const hinweis = document.getElementById("bestand");
+    hinweis.textContent = bestand === "0"
+      ? "Laut unserer Liste bist du diesmal nicht dabei."
+      : `Laut unserer Liste bist du mit ${bestand === "1" ? "1 Person" : "2 Personen"} angemeldet. Wenn sich nichts ändert, musst du nichts tun.`;
+    hinweis.hidden = false;
+  }
 
   function gewaehlt() {
     const o = optionen.find(o => o.checked);
