@@ -88,6 +88,8 @@
   .liste .name { font-weight: 700; color: var(--navy); }
   .liste .weg { font-size: 13px; color: var(--grau); }
   .liste tr.gesamt td { border-top: 3px solid var(--navy); border-bottom: 0; font-size: 18px; font-weight: 700; color: var(--navy); }
+  .bisher-zeile { background: var(--hell); border-left: 3px solid var(--navy); padding: 8px 12px; font-size: 14px; margin: 0 0 12px; }
+  .bisher-zeile a { color: var(--navy); font-weight: 700; }
   .anm-anzeige { font-size: 14px; color: var(--grau); background: var(--hell); padding: 10px 12px; border-radius: 6px; }
   .zurueck { display: block; width: 100%; margin: 0 0 8px; padding: 13px; border: 1px solid var(--navy); border-radius: 6px;
              background: #fff; color: var(--navy); font-family: inherit; font-size: 16px; font-weight: 600; cursor: pointer; }
@@ -131,8 +133,19 @@
   </div>
   </div>
 
+  <section id="schritt-bisher" hidden>
+    <h2 id="bisher-titel">Deine Anmeldung</h2>
+    <p class="fuer2" id="bisher-zeit"></p>
+    <table class="liste" id="bisher-liste"></table>
+    <p class="anm-anzeige" id="bisher-anm" hidden></p>
+    <div class="hinweis" id="bisher-pruefen" hidden></div>
+    <p id="bisher-text"></p>
+    <button class="los" id="bisher-aendern">Anmeldung ändern</button>
+  </section>
+
   <section id="schritt-anmelden">
   <h2>Deine Anmeldung</h2>
+  <p class="bisher-zeile" id="bisher-zeile" hidden></p>
   <p class="fuer2" id="bestand" hidden></p>
   <div class="wahl" role="radiogroup" aria-label="Anmeldung">
     <label class="option"><input type="radio" name="personen" value="1">
@@ -327,8 +340,11 @@
     document.getElementById("los").disabled = e.personen === null || !!text;
     return e;
   }
-  [...optionen, ...aufenthaltWahl, ...anreiseWahl, ...uebernachtungWahl, ...zimmerWahl].forEach(o => { o.onchange = rechnen; });
-  begleitung.oninput = rechnen;
+  // Was das Mitglied selbst anklickt, lässt die geladene Anmeldung nicht mehr darüberlegen.
+  let angefasst = false;
+  const anfassen = () => { angefasst = true; rechnen(); };
+  [...optionen, ...aufenthaltWahl, ...anreiseWahl, ...uebernachtungWahl, ...zimmerWahl].forEach(o => { o.onchange = anfassen; });
+  begleitung.oninput = anfassen;
 
   // Die Anmeldung für die Rückkehr mit der Zurück-Taste merken. Der Browser stellt Feldinhalte
   // sonst erst nach dem ersten Rechnen wieder her.
@@ -340,6 +356,7 @@
     try {
       const g = JSON.parse(sessionStorage.getItem(MERKER) || "null");
       if (!g || g.mitglied !== mitglied) return;
+      angefasst = true;
       optionen.forEach(o => { o.checked = Number(o.value) === g.personen; });
       setzen(aufenthaltWahl, g.aufenthalt || "ganze Reise");
       setzen(anreiseWahl, g.anreise || "Bus");
@@ -350,8 +367,10 @@
     } catch (x) {}
   }
 
-  const schritte = ["schritt-anmelden", "schritt-pruefen", "schritt-danke"];
+  const schritte = ["schritt-bisher", "schritt-anmelden", "schritt-pruefen", "schritt-danke"];
+  let schritt = "schritt-anmelden";
   function zeige(id) {
+    schritt = id;
     schritte.forEach(s => { document.getElementById(s).hidden = s !== id; });
     // Bild, Programm und Regeln nur beim Anmelden, damit Prüfung und Dank oben stehen.
     document.getElementById("einleitung").hidden = id !== "schritt-anmelden";
@@ -465,7 +484,89 @@
     }
   }
 
+  // Die geltende Anmeldung von der Web-App, damit der persönliche Link sie zeigt und zum Ändern vorbelegt.
+  // Anmeldungen laut Protokoll oder mündlich kommen erst mit dem nächsten Abgleich vom PC dazu.
+  let gesendet = false;
+  const zeitText = t => {
+    const m = String(t || "").match(/^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2})/);
+    return m ? `${m[3]}.${m[2]}.${m[1]} um ${m[4]}:${m[5]}` : "";
+  };
+  function zeileSetzen(inhalt) {
+    const z = document.getElementById("bisher-zeile");
+    z.replaceChildren(...(Array.isArray(inhalt) ? inhalt : [inhalt]));
+    z.hidden = !inhalt;
+  }
+
+  function bisherZeigen(b) {
+    const dabei = b.status === "angemeldet", pruefen = b.status === "prüfen";
+    const zeit = zeitText(b.zeit);
+    const vorbei = b.schluss && new Date() > new Date(String(b.schluss).replace(" ", "T"));
+    document.getElementById("bisher-titel").textContent = b.status === "nicht dabei" ? "Diesmal nicht dabei" : "Deine Anmeldung";
+    document.getElementById("bisher-zeit").textContent = zeit
+      ? `${b.status === "nicht dabei" ? "Vermerkt" : "Angemeldet"} am ${zeit}` : "";
+    const tabelle = document.getElementById("bisher-liste");
+    tabelle.hidden = pruefen;
+    if (!pruefen) liste(tabelle, b);
+    const anm = document.getElementById("bisher-anm");
+    anm.hidden = !b.anmerkung;
+    anm.textContent = b.anmerkung ? `Anmerkung: ${b.anmerkung}` : "";
+    const hinweis = document.getElementById("bisher-pruefen");
+    hinweis.hidden = !pruefen;
+    hinweis.textContent = "Deine Anmeldung ist eingegangen, muss aber noch geklärt werden. Hanspeter meldet sich bei dir.";
+    document.getElementById("bisher-text").textContent = vorbei
+      ? "Der Anmeldeschluss ist vorbei. Änderungen bitte direkt bei Hanspeter."
+      : "Wenn sich nichts ändert, musst du nichts tun. Bis zum Anmeldeschluss am 31. Oktober kannst du deine Anmeldung ändern, es gilt die letzte.";
+    const knopf = document.getElementById("bisher-aendern");
+    knopf.textContent = dabei ? "Anmeldung ändern" : b.status === "nicht dabei" ? "Doch anmelden" : "Neu anmelden";
+    knopf.onclick = () => {
+      // Ändern beginnt bei der geltenden Anmeldung; „Doch anmelden“ und „Neu anmelden“ bei einer leeren Auswahl.
+      if (dabei) {
+        optionen.forEach(o => { o.checked = Number(o.value) === b.personen; });
+        if (b.personen === 2 && b.begleitung) begleitung.value = b.begleitung;
+        setzen(aufenthaltWahl, b.aufenthalt || "ganze Reise");
+        setzen(anreiseWahl, b.anreise || "Bus");
+        setzen(uebernachtungWahl, b.uebernachtung || "");
+        if (b.personen === 1) setzen(zimmerWahl, b.zimmer || "");
+        anmerkung.value = b.anmerkung || "";
+      } else {
+        optionen.forEach(o => { o.checked = false; });
+      }
+      angefasst = true;
+      rechnen();
+      zeige("schritt-anmelden");
+    };
+    zeige("schritt-bisher");
+  }
+
+  async function bisherLaden() {
+    if (!GOOGLE || !mitglied) return;
+    zeileSetzen("Deine bisherige Anmeldung wird geladen …");
+    const abbruch = new AbortController();
+    const uhr = setTimeout(() => abbruch.abort(), 20000);
+    try {
+      const antwort = await fetch(`${GOOGLE}?anmeldung=${encodeURIComponent(mitglied)}`, { signal: abbruch.signal });
+      const b = await antwort.json();
+      // „offen“ oder eine Web-App ohne diesen Abruf liefern keinen der drei Fälle; dann bleibt das Formular.
+      if (gesendet || !b.ok || !["angemeldet", "nicht dabei", "prüfen"].includes(b.status)) return zeileSetzen("");
+      document.getElementById("bestand").hidden = true;
+      const link = Object.assign(document.createElement("a"), { href: "#", textContent: "Ansehen" });
+      link.onclick = e => { e.preventDefault(); bisherZeigen(b); };
+      const zeit = zeitText(b.zeit);
+      const am = zeit ? "am " + zeit.replace(" um ", ", ") + " " : "";
+      zeileSetzen([b.status === "nicht dabei" ? `Du hast ${am}vermerkt, dass du diesmal nicht dabei bist. `
+                                              : `Du hast dich ${am}bereits angemeldet. `, link]);
+      if (!angefasst && schritt === "schritt-anmelden") bisherZeigen(b);
+    } catch (e) {
+      zeileSetzen("");
+    } finally {
+      clearTimeout(uhr);
+    }
+  }
+
   function danke(e) {
+    gesendet = true;
+    // Abgeschickt ist abgeschickt: Beim nächsten Öffnen zeigt die Seite die Anmeldung von der Web-App.
+    try { sessionStorage.removeItem(MERKER); } catch (x) {}
     document.getElementById("danke-titel").textContent = vorname ? `Danke, ${vorname}!` : "Danke!";
     document.getElementById("danke-text").textContent = e.personen
       ? `Deine Anmeldung für die Clubreise nach Filzmoos ist eingegangen. Die Vorauszahlung von ${euro(anmeldung(e.personen, e.aufenthalt).betrag)} bucht Christian nach dem Anmeldeschluss ab.`
@@ -490,6 +591,7 @@
   document.getElementById("ersatz").onclick = ersatzmail;
   wiederherstellen();
   rechnen();
+  bisherLaden();
   // Rückkehr aus dem Zwischenspeicher des Browsers: Merker einsetzen und neu rechnen.
   window.addEventListener("pageshow", () => { wiederherstellen(); rechnen(); });
 </script>
