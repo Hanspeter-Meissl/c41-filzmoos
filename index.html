@@ -152,11 +152,21 @@
     <h3>Aufenthalt</h3>
     <div class="wahl" role="radiogroup" aria-label="Aufenthalt">
       <label class="option"><input type="radio" name="aufenthalt" value="ganze Reise">
-        <span class="titel">Ganze Reise</span><span class="preis">250 € je Person</span><span class="zusatz">Freitag bis Sonntag, zwei Nächte, mit dem Bus.</span></label>
+        <span class="titel">Ganze Reise</span><span class="preis">250 € je Person</span><span class="zusatz">Freitag bis Sonntag, zwei Nächte.</span></label>
       <label class="option"><input type="radio" name="aufenthalt" value="nur Freitag">
         <span class="titel">Nur Freitag mit Übernachtung</span><span class="preis">125 € je Person</span><span class="zusatz">Freitag, 4. Dezember, eine Nacht bis Samstag.</span></label>
       <label class="option"><input type="radio" name="aufenthalt" value="nur Samstag">
         <span class="titel">Nur Samstag mit Übernachtung</span><span class="preis">125 € je Person</span><span class="zusatz">Samstag, 5. Dezember mit der Weihnachtsfeier, eine Nacht bis Sonntag.</span></label>
+    </div>
+  </div>
+
+  <div id="anreise-feld" hidden>
+    <h3>Anreise</h3>
+    <div class="wahl" role="radiogroup" aria-label="Anreise">
+      <label class="option"><input type="radio" name="anreise" value="Bus">
+        <span class="titel">Mit dem Bus</span><span class="preis"></span><span class="zusatz">Abfahrt Freitag um 07:30 Uhr, Heimfahrt Sonntag.</span></label>
+      <label class="option"><input type="radio" name="anreise" value="eigenes Auto">
+        <span class="titel">Mit dem eigenen Auto</span><span class="preis"></span><span class="zusatz">Ich fahre selbst nach Filzmoos und zurück.</span></label>
     </div>
   </div>
 
@@ -246,6 +256,7 @@
   const gruppe = name => [...document.querySelectorAll(`input[name="${name}"]`)];
   const optionen = gruppe("personen");
   const aufenthaltWahl = gruppe("aufenthalt"), uebernachtungWahl = gruppe("uebernachtung"), zimmerWahl = gruppe("zimmer");
+  const anreiseWahl = gruppe("anreise");
   const wert = g => (g.find(o => o.checked) || {}).value || "";
   const setzen = (g, w) => g.forEach(o => { o.checked = o.value === w; });
   const begleitung = document.getElementById("begleitung");
@@ -253,6 +264,8 @@
   begleitung.value = vorschlag;
   // Die meisten fahren die ganze Reise mit, deshalb ist sie vorgewählt.
   setzen(aufenthaltWahl, "ganze Reise");
+  // Ebenso der Bus; wer selbst fährt, wählt das eigene Auto.
+  setzen(anreiseWahl, "Bus");
   // Bestätigungslink für bereits Angemeldete: &p=2 wählt die bestehende Anmeldung vor.
   const bestand = parameter.get("p");
   if (["0", "1", "2"].includes(bestand)) {
@@ -270,7 +283,8 @@
   }
 
   // Die Anmeldung, wie die Felder sie gerade zeigen. Was nicht gilt, bleibt leer: der Aufenthalt
-  // ohne Anmeldung, die Übernachtung bei der ganzen Reise, der Zimmerwunsch ohne Zimmer über den Club.
+  // ohne Anmeldung, die Übernachtung bei der ganzen Reise, der Zimmerwunsch ohne Zimmer über den Club,
+  // die Anreise bei nur einer Nacht.
   // Bei 2 Personen ist das Zimmer immer ein Doppelzimmer.
   function lesen() {
     const personen = gewaehlt();
@@ -279,13 +293,15 @@
     const eineNacht = aufenthalt === "nur Freitag" || aufenthalt === "nur Samstag";
     const uebernachtung = eineNacht ? wert(uebernachtungWahl) : "";
     const zimmer = uebernachtung === "Hotel" ? (personen === 2 ? "Doppelzimmer" : wert(zimmerWahl)) : "";
-    return { personen, aufenthalt, eineNacht, uebernachtung, zimmer,
+    const anreise = aufenthalt === "ganze Reise" ? wert(anreiseWahl) : "";
+    return { personen, aufenthalt, eineNacht, uebernachtung, zimmer, anreise,
              begleitung: personen === 2 ? begleitung.value.trim() : "" };
   }
 
   function fehlt(e) {
     if (e.personen === 2 && !e.begleitung) return "Bitte trag den Namen deiner Begleitung ein.";
     if (e.personen > 0 && !e.aufenthalt) return "Bitte wähle deinen Aufenthalt.";
+    if (e.aufenthalt === "ganze Reise" && !e.anreise) return "Bitte wähle deine Anreise.";
     if (e.eineNacht && !e.uebernachtung) return "Bitte wähle, wie du übernachtest.";
     if (e.uebernachtung === "Hotel" && !e.zimmer) return "Bitte wähle deinen Zimmerwunsch.";
     return "";
@@ -297,6 +313,7 @@
     const a = anmeldung(e.personen ?? -1, e.aufenthalt);
     document.getElementById("begleitung-feld").hidden = e.personen !== 2;
     document.getElementById("aufenthalt-feld").hidden = !dabei;
+    document.getElementById("anreise-feld").hidden = e.aufenthalt !== "ganze Reise";
     document.getElementById("nacht-feld").hidden = !e.eineNacht;
     document.getElementById("zimmer-feld").hidden = !(e.uebernachtung === "Hotel" && e.personen === 1);
     document.getElementById("doppel-info").hidden = !(e.uebernachtung === "Hotel" && e.personen === 2);
@@ -310,7 +327,7 @@
     document.getElementById("los").disabled = e.personen === null || !!text;
     return e;
   }
-  [...optionen, ...aufenthaltWahl, ...uebernachtungWahl, ...zimmerWahl].forEach(o => { o.onchange = rechnen; });
+  [...optionen, ...aufenthaltWahl, ...anreiseWahl, ...uebernachtungWahl, ...zimmerWahl].forEach(o => { o.onchange = rechnen; });
   begleitung.oninput = rechnen;
 
   // Die Anmeldung für die Rückkehr mit der Zurück-Taste merken. Der Browser stellt Feldinhalte
@@ -325,6 +342,7 @@
       if (!g || g.mitglied !== mitglied) return;
       optionen.forEach(o => { o.checked = Number(o.value) === g.personen; });
       setzen(aufenthaltWahl, g.aufenthalt || "ganze Reise");
+      setzen(anreiseWahl, g.anreise || "Bus");
       setzen(uebernachtungWahl, g.uebernachtung || "");
       if (g.personen === 1) setzen(zimmerWahl, g.zimmer || "");
       begleitung.value = g.begleitung || "";
@@ -369,7 +387,9 @@
   const AUFENTHALT_TEXT = { "ganze Reise": "Ganze Reise", "nur Freitag": "Nur Freitag mit Übernachtung",
                             "nur Samstag": "Nur Samstag mit Übernachtung" };
   function aufenthaltWeg(e) {
-    if (e.aufenthalt === "ganze Reise") return "Freitag bis Sonntag, mit dem Bus";
+    if (e.aufenthalt === "ganze Reise") {
+      return `Freitag bis Sonntag, ${e.anreise === "eigenes Auto" ? "mit dem eigenen Auto" : "mit dem Bus"}`;
+    }
     const nacht = e.uebernachtung === "Hotel" ? `${e.zimmer} über den Club` : "Übernachtung selbst organisiert";
     return `${nacht}, An- und Abreise selbst`;
   }
@@ -379,7 +399,8 @@
     if (!e.personen) return "keine Anmeldung";
     const a = anmeldung(e.personen, e.aufenthalt);
     return `${e.personen === 1 ? "1 Person" : "2 Personen"}${e.personen === 2 ? ", Begleitung: " + e.begleitung : ""}, `
-         + `${AUFENTHALT_TEXT[e.aufenthalt]}${e.aufenthalt === "ganze Reise" ? "" : " (" + aufenthaltWeg(e) + ")"}, `
+         + `${AUFENTHALT_TEXT[e.aufenthalt]}${e.aufenthalt === "ganze Reise"
+              ? (e.anreise === "eigenes Auto" ? " mit dem eigenen Auto" : "") : " (" + aufenthaltWeg(e) + ")"}, `
          + `Vorauszahlung ${e.personen} × ${a.je} € = ${euro(a.betrag)}`;
   }
 
@@ -389,7 +410,7 @@
     const personen = e.personen;
     if (personen === null || fehlt(e)) return;
     entwurf = { personen, begleitung: e.begleitung, aufenthalt: e.aufenthalt, uebernachtung: e.uebernachtung,
-                zimmer: e.zimmer, anmerkung: anmerkung.value.trim() };
+                zimmer: e.zimmer, anreise: e.anreise, anmerkung: anmerkung.value.trim() };
     merken(entwurf);
     document.getElementById("pruefen-fuer").textContent = mitglied ? `für ${anzeigename}` : "";
     liste(document.getElementById("liste"), entwurf);
@@ -427,6 +448,7 @@
     document.getElementById("fehler").hidden = true;
     const daten = { mitglied, personen: entwurf.personen, begleitung: entwurf.begleitung,
                     aufenthalt: entwurf.aufenthalt, uebernachtung: entwurf.uebernachtung, zimmer: entwurf.zimmer,
+                    anreise: entwurf.anreise,
                     vorauszahlung: zusammenfassung(entwurf), anmerkung: entwurf.anmerkung };
     const abbruch = new AbortController();
     const uhr = setTimeout(() => abbruch.abort(), 25000);
